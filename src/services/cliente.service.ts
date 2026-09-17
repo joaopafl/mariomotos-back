@@ -1,44 +1,41 @@
-import { db } from "../config/database";
-import { Cliente } from "../types";
-import admin from "../config/database";
+import bcrypt from "bcrypt";
+import { Cliente, ICliente } from "../models/Cliente";
 
-const COLLECTION = "clientes";
+const SALT_ROUNDS = 10;
 
 export const clienteService = {
-  async criar(dados: Cliente): Promise<Cliente> {
-    const docRef = await db.collection(COLLECTION).add({
-      ...dados,
-      criadoEm: admin.firestore.Timestamp.now(),
+  async criar(dados: { nome: string; telefone: string; email: string; senha: string }): Promise<ICliente> {
+    const senhaHash = await bcrypt.hash(dados.senha, SALT_ROUNDS);
+    return Cliente.create({
+      nome: dados.nome,
+      telefone: dados.telefone,
+      email: dados.email,
+      senhaHash,
     });
-    return { id: docRef.id, ...dados };
   },
 
-  async listarTodos(): Promise<Cliente[]> {
-    const snapshot = await db.collection(COLLECTION).orderBy("nome").get();
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Cliente));
+  async listarTodos(): Promise<ICliente[]> {
+    return Cliente.find().select("-senhaHash").sort({ nome: 1 });
   },
 
-  async buscarPorId(id: string): Promise<Cliente | null> {
-    const doc = await db.collection(COLLECTION).doc(id).get();
-    if (!doc.exists) return null;
-    return { id: doc.id, ...doc.data() } as Cliente;
+  async buscarPorId(id: string): Promise<ICliente | null> {
+    return Cliente.findById(id).select("-senhaHash");
   },
 
-  async buscarPorNomeOuPlaca(termo: string): Promise<Cliente[]> {
-    // Busca simples por nome (Firestore nao suporta LIKE nativo).
-    // Para producao, considerar Algolia/Typesense se a base crescer muito.
-    const snapshot = await db.collection(COLLECTION).get();
-    const termoLower = termo.toLowerCase();
-    return snapshot.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() } as Cliente))
-      .filter((c) => c.nome.toLowerCase().includes(termoLower));
+  async buscarPorEmail(email: string): Promise<ICliente | null> {
+    // Usado internamente pelo login - PRECISA retornar a senhaHash, por isso sem o .select("-senhaHash")
+    return Cliente.findOne({ email: email.toLowerCase() });
   },
 
-  async atualizar(id: string, dados: Partial<Cliente>): Promise<void> {
-    await db.collection(COLLECTION).doc(id).update(dados);
+  async buscarPorNomeOuPlaca(termo: string): Promise<ICliente[]> {
+    return Cliente.find({ nome: { $regex: termo, $options: "i" } }).select("-senhaHash");
+  },
+
+  async atualizar(id: string, dados: Partial<ICliente>): Promise<void> {
+    await Cliente.findByIdAndUpdate(id, dados);
   },
 
   async deletar(id: string): Promise<void> {
-    await db.collection(COLLECTION).doc(id).delete();
+    await Cliente.findByIdAndDelete(id);
   },
 };

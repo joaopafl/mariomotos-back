@@ -1,7 +1,10 @@
 import { Router, Request, Response } from "express";
 import { clienteService } from "../services/cliente.service";
+import { autenticar, autorizar } from "../middlewares/autenticar.middleware";
 
 const router = Router();
+
+router.use(autenticar);
 
 // RF03 - Cadastrar cliente
 router.post("/", async (req: Request, res: Response) => {
@@ -46,7 +49,8 @@ router.put("/:id", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/:id", async (req: Request, res: Response) => {
+// RN09 - Exclusao restrita a Administrador
+router.delete("/:id", autorizar("administrador"), async (req: Request, res: Response) => {
   try {
     await clienteService.deletar(req.params.id);
     res.status(204).send();

@@ -1,30 +1,23 @@
-import { db } from "../config/database";
-import { Moto } from "../types";
-
-const COLLECTION = "motos";
+import { Moto, IMoto } from "../models/Moto";
 
 export const motoService = {
-  async criar(dados: Moto): Promise<Moto> {
-    const docRef = await db.collection(COLLECTION).add(dados);
-    return { id: docRef.id, ...dados };
+  async criar(dados: Partial<IMoto>): Promise<IMoto> {
+    return Moto.create(dados);
   },
 
-  async listarPorCliente(clienteId: string): Promise<Moto[]> {
-    const snapshot = await db.collection(COLLECTION).where("clienteId", "==", clienteId).get();
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Moto));
+  async listarPorCliente(clienteId: string): Promise<IMoto[]> {
+    return Moto.find({ clienteId });
   },
 
-  async buscarPorId(id: string): Promise<Moto | null> {
-    const doc = await db.collection(COLLECTION).doc(id).get();
-    if (!doc.exists) return null;
-    return { id: doc.id, ...doc.data() } as Moto;
+  async buscarPorId(id: string): Promise<IMoto | null> {
+    return Moto.findById(id);
   },
 
-  async atualizar(id: string, dados: Partial<Moto>): Promise<void> {
-    await db.collection(COLLECTION).doc(id).update(dados);
+  async atualizar(id: string, dados: Partial<IMoto>): Promise<void> {
+    await Moto.findByIdAndUpdate(id, dados);
   },
 
   async deletar(id: string): Promise<void> {
-    await db.collection(COLLECTION).doc(id).delete();
+    await Moto.findByIdAndDelete(id);
   },
 };

@@ -1,15 +1,10 @@
-import admin from "firebase-admin";
+import mongoose from "mongoose";
 import { env } from "./env";
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: env.firebaseProjectId,
-      clientEmail: env.firebaseClientEmail,
-      privateKey: env.firebasePrivateKey,
-    }),
-  });
+export async function connectCoreDB(): Promise<void> {
+  if (!env.mongoUri) {
+    throw new Error("MONGO_URI nao definida no .env");
+  }
+  await mongoose.connect(env.mongoUri);
+  console.log("MongoDB conectado");
 }
-
-export const db = admin.firestore();
-export default admin;
