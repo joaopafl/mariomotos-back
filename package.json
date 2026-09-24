@@ -4,6 +4,7 @@
   "description": "API do sistema de gestao de clientes, historico e agenda da oficina MarioMotos",
   "main": "dist/server.js",
   "scripts": {
+    //Roda o servidor em modo de desenvolvimento
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",

@@ -1,15 +1,25 @@
 {
   "compilerOptions": {
+    //Definição da versão do Java para qual o type script irá compilar
     "target": "ES2020",
+    //Formato de importação e exportação utilizado no codigo compilado
     "module": "CommonJS",
+    //Define o diretorio do codigo fonte a ser desenvolvido
     "rootDir": "./src",
+    //Define o diretorio para onde o codigo compilado será disponibilizado
     "outDir": "./dist",
+    //Define modo mais rigoroso para checagem de tipos
     "strict": true,
+    //Resolve incompatibilidade historica entre dois estilos e importação
     "esModuleInterop": true,
+    //Ignora checagem de tipos denreo de bibliotecas terceiras
     "skipLibCheck": true,
+    //Permite fazer import de dados de arquivos .json diretamente
     "resolveJsonModule": true,
+    //Ignora erros bobos de escrita tais como texto em caixa alta: Exemplo: "Clientes.ts e clientes.ts"
     "forceConsistentCasingInFileNames": true
   },
+  //Include e Exclude: Define quais pastas serão inclusas na compilação e quais não serão
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

@@ -1,5 +1,9 @@
+//importa tres ferramentas da biblioteca mongoose:  Mongoose o pacote principal,
+// schema para definir quais campos o cliente possui e Document para definir que o mesmo é um doc do mongodb 
+// idetificado atraves do seu id
 import mongoose, { Document, Schema } from "mongoose";
 
+//export habilita a função para outros arquivos
 export interface ICliente extends Document {
   nome: string;
   telefone: string;
