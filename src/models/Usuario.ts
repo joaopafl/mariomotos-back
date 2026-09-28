@@ -1,7 +1,10 @@
+//Importação da Biblioteca Mongoose
 import mongoose, { Document, Schema } from "mongoose";
 
+// Define os únicos valores válidos para o perfil de um usuário, restringindo o tipo a essas duas strings. Isso é importante para o sistema saber a qual perfil pertence o usuario, bem como limitar a apenas estes dois perfis
 export type PerfilUsuario = "funcionario" | "administrador";
 
+//Padronização do formato dos dados que o sistema deverá aceitar 
 export interface IUsuario extends Document {
   nome: string;
   email: string;
@@ -11,7 +14,7 @@ export interface IUsuario extends Document {
   createdAt: Date;
   updatedAt: Date;
 }
-
+//Definindo os tipos de dados e variaveis que serão gravadas no banco de dados - Tempo de execução
 const UsuarioSchema = new Schema<IUsuario>(
   {
     nome: { type: String, required: true, trim: true },
@@ -23,4 +26,5 @@ const UsuarioSchema = new Schema<IUsuario>(
   { timestamps: true }
 );
 
+//Cria a model Usuario e o nome da coleção no mongoDb
 export const Usuario = mongoose.model<IUsuario>("Usuario", UsuarioSchema);
