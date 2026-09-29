@@ -17,6 +17,16 @@ router.post("/", async (req: Request, res: Response) => {
   }
 });
 
+// RF16 - Listar todas as motos (somente administrador)
+router.get("/", autorizar("administrador"), async (req: Request, res: Response) => {
+  try {
+    const motos = await motoService.listarTodas();
+    res.json(motos);
+  } catch (err) {
+    res.status(500).json({ erro: (err as Error).message });
+  }
+});
+
 // RF15 - Listar motos de um cliente (suporte a multiplas motos)
 router.get("/cliente/:clienteId", async (req: Request, res: Response) => {
   try {

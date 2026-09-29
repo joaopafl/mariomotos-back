@@ -5,6 +5,10 @@ export const motoService = {
     return Moto.create(dados);
   },
 
+  async listarTodas(): Promise<IMoto[]> {
+    return Moto.find();
+  },
+
   async listarPorCliente(clienteId: string): Promise<IMoto[]> {
     return Moto.find({ clienteId });
   },
