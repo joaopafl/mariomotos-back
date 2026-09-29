@@ -11,6 +11,10 @@ export const servicoService = {
     return Servico.create(dados);
   },
 
+  async listarTodos(): Promise<IServico[]> {
+    return Servico.find().sort({ data: -1 });
+  },
+
   async listarPorMoto(motoId: string): Promise<IServico[]> {
     return Servico.find({ motoId }).sort({ data: -1 });
   },

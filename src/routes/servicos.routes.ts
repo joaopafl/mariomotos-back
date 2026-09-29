@@ -17,6 +17,16 @@ router.post("/", async (req: Request, res: Response) => {
   }
 });
 
+// RF17 - Listar todos os servicos (somente administrador)
+router.get("/", autorizar("administrador"), async (req: Request, res: Response) => {
+  try {
+    const servicos = await servicoService.listarTodos();
+    res.json(servicos);
+  } catch (err) {
+    res.status(500).json({ erro: (err as Error).message });
+  }
+});
+
 // RF08 - Historico de servicos por moto
 router.get("/moto/:motoId", async (req: Request, res: Response) => {
   try {
