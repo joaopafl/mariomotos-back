@@ -10,6 +10,8 @@ import agendamentosRoutes from "./routes/agendamentos.routes";
 import usuariosRoutes from "./routes/usuarios.routes";
 import relatoriosRoutes from "./routes/relatorios.routes";
 import authRoutes from "./routes/auth.routes";
+import tiposServicoRoutes from "./routes/tiposServico.routes";
+import horariosRoutes from "./routes/horarios.routes";
 
 const app = express();
 
@@ -27,6 +29,8 @@ app.use("/servicos", servicosRoutes);
 app.use("/agendamentos", agendamentosRoutes);
 app.use("/usuarios", usuariosRoutes);
 app.use("/relatorios", relatoriosRoutes);
+app.use("/tipos-servico", tiposServicoRoutes);
+app.use("/horarios", horariosRoutes);
 
 async function start() {
   try {

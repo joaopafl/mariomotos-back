@@ -37,6 +37,26 @@ router.get("/:id", async (req: Request, res: Response) => {
   }
 });
 
+// Editar nome, e-mail ou perfil
+router.put("/:id", async (req: Request, res: Response) => {
+  try {
+    await usuarioService.atualizar(req.params.id, req.body);
+    res.status(204).send();
+  } catch (err) {
+    res.status(400).json({ erro: (err as Error).message });
+  }
+});
+
+// Admin redefine a senha de um colaborador: body { "novaSenha": "..." }
+router.put("/:id/senha", async (req: Request, res: Response) => {
+  try {
+    await usuarioService.redefinirSenha(req.params.id, req.body.novaSenha);
+    res.status(204).send();
+  } catch (err) {
+    res.status(400).json({ erro: (err as Error).message });
+  }
+});
+
 // "Remover" funcionario = desativar (nao apaga o historico do que ele registrou)
 router.delete("/:id", async (req: Request, res: Response) => {
   try {
