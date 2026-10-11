@@ -1,8 +1,11 @@
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { Cliente, ICliente } from "../models/Cliente";
+import { Moto } from "../models/Moto";
 import { emailService } from "./email.service";
 import { usuarioService } from "./usuario.service";
+import { validarDadosMoto, DadosMoto } from "./moto.service";
+import { cpfValido, somenteDigitos } from "../utils/validacao";
 
 const SALT_ROUNDS = 10;
 const CODIGO_VALIDADE_MIN = 15;
@@ -13,15 +16,23 @@ function gerarCodigo(): string {
 }
 
 export const clienteService = {
-  // Criacao feita pelo admin/funcionario: ja nasce confirmada
-  async criar(dados: { nome: string; telefone: string; email: string; senha: string }): Promise<ICliente> {
+  // Criacao feita pelo admin/funcionario: ja nasce confirmada. CPF e opcional aqui,
+  // mas, se vier, precisa ser valido e unico.
+  async criar(dados: { nome: string; telefone: string; email: string; senha: string; cpf?: string }): Promise<ICliente> {
     const senhaHash = await bcrypt.hash(dados.senha, SALT_ROUNDS);
-    return Cliente.create({
+    const novo: any = {
       nome: dados.nome,
       telefone: dados.telefone,
       email: dados.email,
       senhaHash,
-    });
+    };
+    if (dados.cpf && String(dados.cpf).trim() !== "") {
+      if (!cpfValido(dados.cpf)) throw new Error("CPF invalido.");
+      const cpf = somenteDigitos(dados.cpf);
+      if (await Cliente.exists({ cpf })) throw new Error("CPF ja cadastrado.");
+      novo.cpf = cpf;
+    }
+    return Cliente.create(novo);
   },
 
   async listarTodos(): Promise<ICliente[]> {
@@ -47,6 +58,18 @@ export const clienteService = {
     delete (resto as any).emailConfirmado;
     delete (resto as any).codigoHash;
     const atualizacao: any = { ...resto };
+
+    if (atualizacao.cpf !== undefined) {
+      if (String(atualizacao.cpf).trim() === "") {
+        delete atualizacao.cpf;
+      } else {
+        if (!cpfValido(atualizacao.cpf)) throw new Error("CPF invalido.");
+        const cpf = somenteDigitos(atualizacao.cpf);
+        const outro = await Cliente.findOne({ cpf, _id: { $ne: id } });
+        if (outro) throw new Error("CPF ja cadastrado.");
+        atualizacao.cpf = cpf;
+      }
+    }
     if (senha) {
       atualizacao.senhaHash = await bcrypt.hash(senha, SALT_ROUNDS);
     }
@@ -68,8 +91,18 @@ export const clienteService = {
     await emailService.enviarSenhaTemporaria(cliente.email, cliente.nome, temporaria);
   },
 
-  /** Auto-cadastro: cria a conta como nao confirmada e envia o codigo por e-mail. */
-  async cadastrar(dados: { nome: string; telefone: string; email: string; senha: string }): Promise<void> {
+  /**
+   * Auto-cadastro: exige CPF valido e uma moto. Cria a conta como nao confirmada
+   * e envia o codigo por e-mail.
+   */
+  async cadastrar(dados: {
+    nome: string;
+    telefone: string;
+    email: string;
+    senha: string;
+    cpf: string;
+    moto: Partial<DadosMoto>;
+  }): Promise<void> {
     const nome = (dados.nome || "").trim();
     const telefone = (dados.telefone || "").trim();
     const email = (dados.email || "").toLowerCase().trim();
@@ -81,6 +114,13 @@ export const clienteService = {
     if (senha.length < 6) {
       throw new Error("A senha deve ter pelo menos 6 caracteres.");
     }
+    if (!cpfValido(dados.cpf || "")) {
+      throw new Error("CPF invalido.");
+    }
+    const cpf = somenteDigitos(dados.cpf);
+    // Valida a moto ANTES de criar qualquer coisa, para nao deixar cadastro pela metade
+    const moto = validarDadosMoto(dados.moto || {});
+
     if (await usuarioService.buscarPorEmail(email)) {
       throw new Error("E-mail ja cadastrado.");
     }
@@ -90,16 +130,38 @@ export const clienteService = {
       throw new Error("E-mail ja cadastrado.");
     }
 
+    // CPF ja usado? Se o dono e um cadastro abandonado (nunca confirmou), libera o CPF.
+    const donoDoCpf = await Cliente.findOne({ cpf });
+    if (donoDoCpf && (!existente || String(donoDoCpf._id) !== String(existente._id))) {
+      if (donoDoCpf.emailConfirmado === false) {
+        await Moto.deleteMany({ clienteId: donoDoCpf._id });
+        await donoDoCpf.deleteOne();
+      } else {
+        throw new Error("CPF ja cadastrado.");
+      }
+    }
+
     const codigo = gerarCodigo();
+    const eraNovo = !existente;
     const cliente = existente ?? new Cliente({ email });
     cliente.nome = nome;
     cliente.telefone = telefone;
+    cliente.cpf = cpf;
     cliente.senhaHash = await bcrypt.hash(senha, SALT_ROUNDS);
     cliente.emailConfirmado = false;
     cliente.codigoHash = await bcrypt.hash(codigo, SALT_ROUNDS);
     cliente.codigoExpiraEm = new Date(Date.now() + CODIGO_VALIDADE_MIN * 60 * 1000);
     cliente.tentativasCodigo = 0;
     await cliente.save();
+
+    try {
+      // Se era um cadastro pendente anterior, a moto antiga e substituida pela nova
+      await Moto.deleteMany({ clienteId: cliente._id });
+      await Moto.create({ clienteId: cliente._id, ...moto });
+    } catch (err) {
+      if (eraNovo) await cliente.deleteOne();
+      throw new Error("Nao foi possivel cadastrar a moto. Tente novamente.");
+    }
 
     try {
       await emailService.enviarCodigoConfirmacao(cliente.email, cliente.nome, codigo);

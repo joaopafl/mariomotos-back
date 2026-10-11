@@ -4,6 +4,7 @@ export interface ICliente extends Document {
   nome: string;
   telefone: string;
   email: string;
+  cpf?: string;
   senhaHash: string;
   emailConfirmado: boolean;
   codigoHash?: string;
@@ -18,6 +19,8 @@ const ClienteSchema = new Schema<ICliente>(
     nome: { type: String, required: true, trim: true },
     telefone: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    // somente digitos; unico, mas opcional para clientes antigos (indice "sparse")
+    cpf: { type: String, unique: true, sparse: true, trim: true },
     senhaHash: { type: String, required: true },
     // true por padrao: clientes ja existentes e criados pelo admin nao precisam confirmar
     emailConfirmado: { type: Boolean, default: true },
