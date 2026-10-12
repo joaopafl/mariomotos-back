@@ -40,6 +40,9 @@ export const authService = {
       if (!senhaConfere) {
         throw new Error("E-mail ou senha invalidos.");
       }
+      if (cliente.ativo === false) {
+        throw new Error("Conta desativada. Procure a oficina.");
+      }
       if (cliente.emailConfirmado === false) {
         throw new Error("Confirme seu e-mail para entrar. Enviamos um codigo para voce.");
       }

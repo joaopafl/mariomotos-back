@@ -107,13 +107,4 @@ router.put("/:id/reativar", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/:id", autorizar("administrador"), async (req: Request, res: Response) => {
-  try {
-    await motoService.deletar(req.params.id);
-    res.status(204).send();
-  } catch (err) {
-    res.status(409).json({ erro: (err as Error).message });
-  }
-});
-
 export default router;

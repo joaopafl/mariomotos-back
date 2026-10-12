@@ -11,6 +11,10 @@ const SALT_ROUNDS = 10;
 const CODIGO_VALIDADE_MIN = 15;
 const MAX_TENTATIVAS = 5;
 
+function escaparRegex(texto: string): string {
+  return texto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function gerarCodigo(): string {
   return crypto.randomInt(100000, 1000000).toString();
 }
@@ -48,14 +52,26 @@ export const clienteService = {
     return Cliente.findOne({ email: email.toLowerCase() });
   },
 
-  async buscarPorNomeOuPlaca(termo: string): Promise<ICliente[]> {
-    return Cliente.find({ nome: { $regex: termo, $options: "i" } }).select("-senhaHash");
+  /** Busca por nome, e-mail, telefone, CPF ou placa de uma moto do cliente. */
+  async buscarPorNomeOuPlaca(termoBruto: string): Promise<ICliente[]> {
+    const termo = termoBruto.trim();
+    const regex = new RegExp(escaparRegex(termo), "i");
+    const ou: any[] = [{ nome: regex }, { email: regex }, { telefone: regex }];
+    const digitos = somenteDigitos(termo);
+    if (digitos.length >= 3) ou.push({ cpf: { $regex: digitos } });
+
+    const motos = await Moto.find({ placa: regex }).select("clienteId");
+    if (motos.length > 0) {
+      ou.push({ _id: { $in: motos.map((m) => m.clienteId) } });
+    }
+    return Cliente.find({ $or: ou }).select("-senhaHash").sort({ nome: 1 });
   },
 
   async atualizar(id: string, dados: Partial<ICliente> & { senha?: string }): Promise<void> {
     const { senha, ...resto } = dados;
     delete (resto as any).senhaHash;
     delete (resto as any).emailConfirmado;
+    delete (resto as any).ativo;
     delete (resto as any).codigoHash;
     const atualizacao: any = { ...resto };
 
@@ -76,8 +92,13 @@ export const clienteService = {
     await Cliente.findByIdAndUpdate(id, atualizacao);
   },
 
-  async deletar(id: string): Promise<void> {
-    await Cliente.findByIdAndDelete(id);
+  // Clientes nunca sao apagados: desativar preserva motos, servicos e relatorios.
+  async desativar(id: string): Promise<void> {
+    await Cliente.findByIdAndUpdate(id, { ativo: false });
+  },
+
+  async reativar(id: string): Promise<void> {
+    await Cliente.findByIdAndUpdate(id, { ativo: true });
   },
 
   /** "Esqueci minha senha": gera senha temporaria, grava o hash e envia por e-mail. */

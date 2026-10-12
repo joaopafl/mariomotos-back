@@ -7,6 +7,7 @@ export interface ICliente extends Document {
   cpf?: string;
   senhaHash: string;
   emailConfirmado: boolean;
+  ativo: boolean;
   codigoHash?: string;
   codigoExpiraEm?: Date;
   tentativasCodigo: number;
@@ -24,6 +25,8 @@ const ClienteSchema = new Schema<ICliente>(
     senhaHash: { type: String, required: true },
     // true por padrao: clientes ja existentes e criados pelo admin nao precisam confirmar
     emailConfirmado: { type: Boolean, default: true },
+    // desativar em vez de excluir: preserva historico, relatorios e rastreamento
+    ativo: { type: Boolean, default: true },
     codigoHash: { type: String, select: false },
     codigoExpiraEm: { type: Date },
     tentativasCodigo: { type: Number, default: 0 },

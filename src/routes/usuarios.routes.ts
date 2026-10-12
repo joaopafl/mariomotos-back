@@ -60,6 +60,9 @@ router.put("/:id/senha", async (req: Request, res: Response) => {
 // "Remover" funcionario = desativar (nao apaga o historico do que ele registrou)
 router.delete("/:id", async (req: Request, res: Response) => {
   try {
+    if (req.usuarioAutenticado?.id === req.params.id) {
+      return res.status(400).json({ erro: "Voce nao pode desativar a propria conta." });
+    }
     await usuarioService.desativar(req.params.id);
     res.status(204).send();
   } catch (err) {

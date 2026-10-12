@@ -81,14 +81,4 @@ export const motoService = {
     moto.ativa = true;
     await moto.save();
   },
-
-  /** Exclusao (admin): tambem nao deixa o cliente sem nenhuma moto ativa. */
-  async deletar(id: string): Promise<void> {
-    const moto = await Moto.findById(id);
-    if (!moto) throw new Error("Moto nao encontrada.");
-    if (moto.ativa !== false && (await this.contarOutrasAtivas(moto.clienteId, moto._id)) === 0) {
-      throw new Error("O cliente precisa ter pelo menos uma moto ativa. Cadastre outra antes de excluir esta.");
-    }
-    await moto.deleteOne();
-  },
 };

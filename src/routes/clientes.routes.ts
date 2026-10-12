@@ -49,10 +49,19 @@ router.put("/:id", async (req: Request, res: Response) => {
   }
 });
 
-// RN09 - Exclusao restrita a Administrador
-router.delete("/:id", autorizar("administrador"), async (req: Request, res: Response) => {
+// RN09 - Desativar / reativar restrito a Administrador (cliente nunca e apagado)
+router.put("/:id/desativar", autorizar("administrador"), async (req: Request, res: Response) => {
   try {
-    await clienteService.deletar(req.params.id);
+    await clienteService.desativar(req.params.id);
+    res.status(204).send();
+  } catch (err) {
+    res.status(400).json({ erro: (err as Error).message });
+  }
+});
+
+router.put("/:id/reativar", autorizar("administrador"), async (req: Request, res: Response) => {
+  try {
+    await clienteService.reativar(req.params.id);
     res.status(204).send();
   } catch (err) {
     res.status(400).json({ erro: (err as Error).message });

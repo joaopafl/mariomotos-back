@@ -6,16 +6,18 @@ const router = Router();
 
 router.use(autenticar);
 
-// Qualquer usuario logado (cliente, funcionario, admin) consulta o catalogo
-router.get("/", async (_req: Request, res: Response) => {
+// Qualquer usuario logado consulta o catalogo. Administrador ve tambem os
+// desativados (para poder reativar); os demais veem so os ativos.
+router.get("/", async (req: Request, res: Response) => {
   try {
-    res.json(await tipoServicoService.listarTodos());
+    const ehAdmin = req.usuarioAutenticado?.perfil === "administrador";
+    res.json(await tipoServicoService.listarTodos(!ehAdmin));
   } catch (err) {
     res.status(500).json({ erro: (err as Error).message });
   }
 });
 
-// Somente administrador cadastra, edita e exclui
+// Somente administrador cadastra, edita e desativa
 router.post("/", autorizar("administrador"), async (req: Request, res: Response) => {
   try {
     const criado = await tipoServicoService.criar(req.body);
@@ -36,9 +38,19 @@ router.put("/:id", autorizar("administrador"), async (req: Request, res: Respons
   }
 });
 
-router.delete("/:id", autorizar("administrador"), async (req: Request, res: Response) => {
+// Desativar / reativar (nunca exclui)
+router.put("/:id/desativar", autorizar("administrador"), async (req: Request, res: Response) => {
   try {
-    await tipoServicoService.deletar(req.params.id);
+    await tipoServicoService.desativar(req.params.id);
+    res.status(204).send();
+  } catch (err) {
+    res.status(400).json({ erro: (err as Error).message });
+  }
+});
+
+router.put("/:id/reativar", autorizar("administrador"), async (req: Request, res: Response) => {
+  try {
+    await tipoServicoService.reativar(req.params.id);
     res.status(204).send();
   } catch (err) {
     res.status(400).json({ erro: (err as Error).message });

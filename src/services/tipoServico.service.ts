@@ -5,8 +5,9 @@ export const tipoServicoService = {
     return TipoServico.create(dados);
   },
 
-  async listarTodos(): Promise<ITipoServico[]> {
-    return TipoServico.find().sort({ nome: 1 });
+  async listarTodos(somenteAtivos = false): Promise<ITipoServico[]> {
+    const filtro = somenteAtivos ? { ativo: { $ne: false } } : {};
+    return TipoServico.find(filtro).sort({ nome: 1 });
   },
 
   async atualizar(id: string, dados: { nome?: string; descricao?: string; valorPadrao?: number }): Promise<void> {
@@ -17,7 +18,12 @@ export const tipoServicoService = {
     await TipoServico.findByIdAndUpdate(id, permitido, { runValidators: true });
   },
 
-  async deletar(id: string): Promise<void> {
-    await TipoServico.findByIdAndDelete(id);
+  // Nunca apaga: servicos ja realizados guardam o nome do catalogo.
+  async desativar(id: string): Promise<void> {
+    await TipoServico.findByIdAndUpdate(id, { ativo: false });
+  },
+
+  async reativar(id: string): Promise<void> {
+    await TipoServico.findByIdAndUpdate(id, { ativo: true });
   },
 };

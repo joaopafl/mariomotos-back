@@ -1,11 +1,19 @@
 import { Router, Request, Response } from "express";
 import { servicoService } from "../services/servico.service";
-
 import { autenticar, autorizar } from "../middlewares/autenticar.middleware";
 
 const router = Router();
 
 router.use(autenticar);
+
+// Admin: todos os servicos realizados
+router.get("/", autorizar("administrador"), async (_req: Request, res: Response) => {
+  try {
+    res.json(await servicoService.listarTodos());
+  } catch (err) {
+    res.status(500).json({ erro: (err as Error).message });
+  }
+});
 
 // RF07 - Registrar servico prestado
 router.post("/", async (req: Request, res: Response) => {
@@ -14,16 +22,6 @@ router.post("/", async (req: Request, res: Response) => {
     res.status(201).json(servico);
   } catch (err) {
     res.status(400).json({ erro: (err as Error).message });
-  }
-});
-
-// RF17 - Listar todos os servicos (somente administrador)
-router.get("/", autorizar("administrador"), async (req: Request, res: Response) => {
-  try {
-    const servicos = await servicoService.listarTodos();
-    res.json(servicos);
-  } catch (err) {
-    res.status(500).json({ erro: (err as Error).message });
   }
 });
 
@@ -56,9 +54,19 @@ router.put("/:id", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/:id", autorizar("administrador"), async (req: Request, res: Response) => {
+// Desativar / reativar (nunca exclui) - somente administrador
+router.put("/:id/desativar", autorizar("administrador"), async (req: Request, res: Response) => {
   try {
-    await servicoService.deletar(req.params.id);
+    await servicoService.desativar(req.params.id);
+    res.status(204).send();
+  } catch (err) {
+    res.status(400).json({ erro: (err as Error).message });
+  }
+});
+
+router.put("/:id/reativar", autorizar("administrador"), async (req: Request, res: Response) => {
+  try {
+    await servicoService.reativar(req.params.id);
     res.status(204).send();
   } catch (err) {
     res.status(400).json({ erro: (err as Error).message });
