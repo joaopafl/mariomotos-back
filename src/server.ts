@@ -12,6 +12,8 @@ import relatoriosRoutes from "./routes/relatorios.routes";
 import authRoutes from "./routes/auth.routes";
 import tiposServicoRoutes from "./routes/tiposServico.routes";
 import horariosRoutes from "./routes/horarios.routes";
+import dispositivosRoutes from "./routes/dispositivos.routes";
+import { iniciarLembretes } from "./services/lembrete.service";
 
 const app = express();
 
@@ -31,10 +33,12 @@ app.use("/usuarios", usuariosRoutes);
 app.use("/relatorios", relatoriosRoutes);
 app.use("/tipos-servico", tiposServicoRoutes);
 app.use("/horarios", horariosRoutes);
+app.use("/dispositivos", dispositivosRoutes);
 
 async function start() {
   try {
     await connectCoreDB();
+    iniciarLembretes();
     app.listen(env.port, () => {
       console.log(`Servidor MarioMotos rodando em http://localhost:${env.port}`);
     });
