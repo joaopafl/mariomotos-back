@@ -1,17 +1,38 @@
 import bcrypt from "bcrypt";
 import { Usuario, IUsuario } from "../models/Usuario";
+import { cpfValido, somenteDigitos } from "../utils/validacao";
 
 const SALT_ROUNDS = 10;
 
 export const usuarioService = {
-  async criar(dados: { nome: string; email: string; senha: string; perfil: "funcionario" | "administrador" }): Promise<IUsuario> {
+  /** Valida o CPF e confere se ainda nao esta em uso por outro usuario. */
+  async validarCpf(cpfBruto: string, ignorarId?: string): Promise<string> {
+    if (!cpfValido(cpfBruto || "")) throw new Error("CPF invalido.");
+    const cpf = somenteDigitos(cpfBruto);
+    const filtro: any = { cpf };
+    if (ignorarId) filtro._id = { $ne: ignorarId };
+    if (await Usuario.exists(filtro)) throw new Error("CPF ja cadastrado.");
+    return cpf;
+  },
+
+  async criar(dados: {
+    nome: string;
+    email: string;
+    senha: string;
+    perfil: "funcionario" | "administrador";
+    cpf?: string;
+    titulo?: string;
+  }): Promise<IUsuario> {
     const senhaHash = await bcrypt.hash(dados.senha, SALT_ROUNDS);
-    return Usuario.create({
+    const novo: any = {
       nome: dados.nome,
       email: dados.email,
       perfil: dados.perfil,
       senhaHash,
-    });
+    };
+    if (dados.cpf) novo.cpf = await this.validarCpf(dados.cpf);
+    if (dados.titulo) novo.titulo = dados.titulo.trim();
+    return Usuario.create(novo);
   },
 
   async listarTodos(): Promise<IUsuario[]> {
@@ -27,8 +48,13 @@ export const usuarioService = {
     return Usuario.findOne({ email: email.toLowerCase() });
   },
 
-  async atualizar(id: string, dados: { nome?: string; email?: string; perfil?: "funcionario" | "administrador" }): Promise<void> {
+  async atualizar(
+    id: string,
+    dados: { nome?: string; email?: string; perfil?: "funcionario" | "administrador"; cpf?: string; titulo?: string }
+  ): Promise<void> {
     const permitido: any = {};
+    if (dados.cpf) permitido.cpf = await this.validarCpf(dados.cpf, id);
+    if (dados.titulo !== undefined) permitido.titulo = String(dados.titulo).trim();
     if (dados.nome) permitido.nome = dados.nome;
     if (dados.email) permitido.email = dados.email.toLowerCase();
     if (dados.perfil) permitido.perfil = dados.perfil;

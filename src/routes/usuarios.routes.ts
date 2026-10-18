@@ -11,6 +11,9 @@ router.use(autorizar("administrador"));
 // Criar conta de funcionario ou administrador
 router.post("/", async (req: Request, res: Response) => {
   try {
+    if (!req.body.cpf || !String(req.body.titulo || "").trim()) {
+      return res.status(400).json({ erro: "Informe o CPF e a profissao (titulo) do usuario." });
+    }
     const usuario = await usuarioService.criar(req.body);
     res.status(201).json(usuario);
   } catch (err) {
@@ -40,6 +43,9 @@ router.get("/:id", async (req: Request, res: Response) => {
 // Editar nome, e-mail ou perfil
 router.put("/:id", async (req: Request, res: Response) => {
   try {
+    if (req.body.titulo !== undefined && !String(req.body.titulo).trim()) {
+      return res.status(400).json({ erro: "Informe a profissao (titulo) do usuario." });
+    }
     await usuarioService.atualizar(req.params.id, req.body);
     res.status(204).send();
   } catch (err) {

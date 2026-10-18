@@ -34,9 +34,10 @@ router.get("/", autorizar("administrador"), async (_req: Request, res: Response)
   }
 });
 
-// RF04 - Cadastrar moto vinculada a um cliente.
+// RF04 - Cadastrar moto vinculada a um cliente (administrador ou o proprio cliente;
+// funcionario so consulta).
 // Se quem cadastra e o proprio cliente, a moto e sempre dele.
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", autorizar("administrador", "cliente"), async (req: Request, res: Response) => {
   try {
     const dados = { ...req.body };
     if (req.usuarioAutenticado?.perfil === "cliente") {
@@ -75,7 +76,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 });
 
 // Editar placa, modelo ou ano (o dono e o status nao mudam por aqui)
-router.put("/:id", async (req: Request, res: Response) => {
+router.put("/:id", autorizar("administrador", "cliente"), async (req: Request, res: Response) => {
   try {
     if (!(await podeMexerNaMoto(req, res, req.params.id))) return;
     const { placa, modelo, ano } = req.body;
@@ -87,7 +88,7 @@ router.put("/:id", async (req: Request, res: Response) => {
 });
 
 // Desativar: o cliente precisa continuar com pelo menos uma moto ativa
-router.put("/:id/desativar", async (req: Request, res: Response) => {
+router.put("/:id/desativar", autorizar("administrador", "cliente"), async (req: Request, res: Response) => {
   try {
     if (!(await podeMexerNaMoto(req, res, req.params.id))) return;
     await motoService.desativar(req.params.id);
@@ -97,7 +98,7 @@ router.put("/:id/desativar", async (req: Request, res: Response) => {
   }
 });
 
-router.put("/:id/reativar", async (req: Request, res: Response) => {
+router.put("/:id/reativar", autorizar("administrador", "cliente"), async (req: Request, res: Response) => {
   try {
     if (!(await podeMexerNaMoto(req, res, req.params.id))) return;
     await motoService.reativar(req.params.id);

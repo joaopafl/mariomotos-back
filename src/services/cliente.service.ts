@@ -20,23 +20,47 @@ function gerarCodigo(): string {
 }
 
 export const clienteService = {
-  // Criacao feita pelo admin/funcionario: ja nasce confirmada. CPF e opcional aqui,
-  // mas, se vier, precisa ser valido e unico.
-  async criar(dados: { nome: string; telefone: string; email: string; senha: string; cpf?: string }): Promise<ICliente> {
-    const senhaHash = await bcrypt.hash(dados.senha, SALT_ROUNDS);
-    const novo: any = {
-      nome: dados.nome,
-      telefone: dados.telefone,
-      email: dados.email,
-      senhaHash,
-    };
-    if (dados.cpf && String(dados.cpf).trim() !== "") {
-      if (!cpfValido(dados.cpf)) throw new Error("CPF invalido.");
-      const cpf = somenteDigitos(dados.cpf);
-      if (await Cliente.exists({ cpf })) throw new Error("CPF ja cadastrado.");
-      novo.cpf = cpf;
+  // Criacao feita pelo administrador: ja nasce confirmada. Igual ao auto-cadastro,
+  // exige CPF valido e uma moto (o cliente sempre precisa ter uma moto ativa).
+  async criar(dados: {
+    nome: string;
+    telefone: string;
+    email: string;
+    senha: string;
+    cpf: string;
+    moto: Partial<DadosMoto>;
+  }): Promise<ICliente> {
+    if (!dados.nome || !dados.telefone || !dados.email || !dados.senha) {
+      throw new Error("Preencha nome, telefone, e-mail e senha.");
     }
-    return Cliente.create(novo);
+    if (dados.senha.length < 6) {
+      throw new Error("A senha deve ter pelo menos 6 caracteres.");
+    }
+    if (!cpfValido(dados.cpf || "")) throw new Error("CPF invalido.");
+    const cpf = somenteDigitos(dados.cpf);
+    const moto = validarDadosMoto(dados.moto || {});
+
+    const email = dados.email.toLowerCase().trim();
+    if ((await usuarioService.buscarPorEmail(email)) || (await Cliente.exists({ email }))) {
+      throw new Error("E-mail ja cadastrado.");
+    }
+    if (await Cliente.exists({ cpf })) throw new Error("CPF ja cadastrado.");
+
+    const senhaHash = await bcrypt.hash(dados.senha, SALT_ROUNDS);
+    const cliente = await Cliente.create({
+      nome: dados.nome.trim(),
+      telefone: dados.telefone.trim(),
+      email,
+      cpf,
+      senhaHash,
+    });
+    try {
+      await Moto.create({ clienteId: cliente._id, ...moto });
+    } catch (err) {
+      await cliente.deleteOne();
+      throw new Error("Nao foi possivel cadastrar a moto. Tente novamente.");
+    }
+    return cliente;
   },
 
   async listarTodos(): Promise<ICliente[]> {

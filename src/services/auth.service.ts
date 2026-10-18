@@ -18,7 +18,7 @@ export const authService = {
    * Primeiro procura na colecao de Usuarios (equipe: funcionario/administrador);
    * se nao achar, procura na colecao de Clientes.
    */
-  async login(email: string, senha: string): Promise<{ token: string; perfil: PerfilToken; nome: string }> {
+  async login(email: string, senha: string): Promise<{ token: string; perfil: PerfilToken; nome: string; titulo: string }> {
     const usuario = await usuarioService.buscarPorEmail(email);
 
     if (usuario) {
@@ -30,8 +30,8 @@ export const authService = {
         throw new Error("E-mail ou senha invalidos.");
       }
       const payload: TokenPayload = { id: String(usuario._id), nome: usuario.nome, perfil: usuario.perfil };
-      const token = jwt.sign(payload, env.jwtSecret, { expiresIn: env.jwtExpiresIn });
-      return { token, perfil: usuario.perfil, nome: usuario.nome };
+      const token = jwt.sign(payload, env.jwtSecret, { expiresIn: env.jwtExpiresIn as jwt.SignOptions["expiresIn"] });
+      return { token, perfil: usuario.perfil, nome: usuario.nome, titulo: usuario.titulo || "" };
     }
 
     const cliente = await clienteService.buscarPorEmail(email);
@@ -47,8 +47,8 @@ export const authService = {
         throw new Error("Confirme seu e-mail para entrar. Enviamos um codigo para voce.");
       }
       const payload: TokenPayload = { id: String(cliente._id), nome: cliente.nome, perfil: "cliente" };
-      const token = jwt.sign(payload, env.jwtSecret, { expiresIn: env.jwtExpiresIn });
-      return { token, perfil: "cliente", nome: cliente.nome };
+      const token = jwt.sign(payload, env.jwtSecret, { expiresIn: env.jwtExpiresIn as jwt.SignOptions["expiresIn"] });
+      return { token, perfil: "cliente", nome: cliente.nome, titulo: "" };
     }
 
     // Mensagem generica de proposito - nao revela se o problema foi email ou senha

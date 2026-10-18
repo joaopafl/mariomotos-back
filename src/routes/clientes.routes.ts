@@ -6,8 +6,8 @@ const router = Router();
 
 router.use(autenticar);
 
-// RF03 - Cadastrar cliente
-router.post("/", async (req: Request, res: Response) => {
+// RF03 - Cadastrar cliente (somente administrador)
+router.post("/", autorizar("administrador"), async (req: Request, res: Response) => {
   try {
     const cliente = await clienteService.criar(req.body);
     res.status(201).json(cliente);
@@ -39,8 +39,8 @@ router.get("/:id", async (req: Request, res: Response) => {
   }
 });
 
-// RF05 - Editar cliente
-router.put("/:id", async (req: Request, res: Response) => {
+// RF05 - Editar cliente (somente administrador)
+router.put("/:id", autorizar("administrador"), async (req: Request, res: Response) => {
   try {
     await clienteService.atualizar(req.params.id, req.body);
     res.status(204).send();
