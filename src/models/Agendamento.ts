@@ -13,6 +13,8 @@ export interface IAgendamento extends Document {
   atendenteNome?: string;
   atendenteTitulo?: string;
   observacoesAtendimento?: string;
+  valorFinal?: number;
+  servicoId?: Types.ObjectId;
   lembreteEnviadoEm?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -33,6 +35,9 @@ const AgendamentoSchema = new Schema<IAgendamento>(
     atendenteNome: { type: String, trim: true },
     atendenteTitulo: { type: String, trim: true },
     observacoesAtendimento: { type: String, trim: true },
+    // Valor cobrado e o servico gerado no historico ao finalizar
+    valorFinal: { type: Number, min: 0 },
+    servicoId: { type: Schema.Types.ObjectId, ref: "Servico" },
     // Controle do lembrete enviado um dia antes
     lembreteEnviadoEm: { type: Date },
   },

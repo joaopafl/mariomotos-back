@@ -4,6 +4,9 @@ import { horarioService } from "../services/horario.service";
 import { notificacaoService } from "../services/notificacao.service";
 import { autenticar, autorizar } from "../middlewares/autenticar.middleware";
 import { IAgendamento } from "../models/Agendamento";
+import { Cliente } from "../models/Cliente";
+import { Moto } from "../models/Moto";
+import { TipoServico } from "../models/TipoServico";
 
 const router = Router();
 
@@ -57,6 +60,16 @@ router.get("/cliente/:clienteId", async (req: Request, res: Response) => {
   }
 });
 
+// Quantos atendimentos o funcionario logado finalizou neste mes (card do dashboard)
+router.get("/atendimentos/mes", autorizar("funcionario"), async (req: Request, res: Response) => {
+  try {
+    const quantidade = await agendamentoService.contarFinalizadosNoMes(req.usuarioAutenticado!.id);
+    res.json({ quantidade });
+  } catch (err) {
+    res.status(500).json({ erro: (err as Error).message });
+  }
+});
+
 router.get("/:id", async (req: Request, res: Response) => {
   try {
     const agendamento = await agendamentoService.buscarPorId(req.params.id);
@@ -65,7 +78,13 @@ router.get("/:id", async (req: Request, res: Response) => {
     if (usuario?.perfil === "cliente" && String(agendamento.clienteId) !== usuario.id) {
       return res.status(403).json({ erro: "Voce so pode ver os seus agendamentos." });
     }
-    res.json(comHoraDoServidor(agendamento));
+    // Junta os dados da moto e do cliente, para a tela de detalhes nao depender de outras rotas
+    const [cliente, moto, tipo] = await Promise.all([
+      Cliente.findById(agendamento.clienteId).select("nome telefone email").lean(),
+      Moto.findById(agendamento.motoId).select("modelo placa ano").lean(),
+      TipoServico.findOne({ nome: agendamento.tipoServicoPrevisto }).select("valorPadrao").lean(),
+    ]);
+    res.json({ ...comHoraDoServidor(agendamento), cliente, moto, valorTabelado: tipo?.valorPadrao ?? 0 });
   } catch (err) {
     res.status(500).json({ erro: (err as Error).message });
   }
@@ -77,11 +96,18 @@ router.put("/:id", async (req: Request, res: Response) => {
     const dados = { ...req.body };
     const usuario = req.usuarioAutenticado;
 
+    if (usuario?.perfil === "funcionario") {
+      return res.status(403).json({ erro: "Funcionario nao pode editar agendamentos. Fale com o administrador." });
+    }
+
     if (usuario?.perfil === "cliente") {
       const existente = await agendamentoService.buscarPorId(req.params.id);
       if (!existente) return res.status(404).json({ erro: "Agendamento nao encontrado" });
       if (String(existente.clienteId) !== usuario.id) {
         return res.status(403).json({ erro: "Voce so pode alterar os seus agendamentos." });
+      }
+      if (existente.iniciadoEm) {
+        return res.status(409).json({ erro: "Este atendimento ja foi iniciado e nao pode ser alterado." });
       }
       delete dados.clienteId; // cliente nao troca o dono do agendamento
       const mudouHorario =
@@ -116,14 +142,18 @@ router.put("/:id/iniciar", autorizar("funcionario"), async (req: Request, res: R
 // ...e finaliza, informando as observacoes do que foi feito. O cliente recebe o aviso de servico pronto.
 router.put("/:id/finalizar", autorizar("funcionario"), async (req: Request, res: Response) => {
   try {
+    const bruto = req.body?.valor;
+    const valor = bruto === undefined || bruto === null || bruto === "" ? undefined : Number(bruto);
     const agendamento = await agendamentoService.finalizar(
       req.params.id,
       req.usuarioAutenticado!,
-      String(req.body?.observacoes ?? "")
+      String(req.body?.observacoes ?? ""),
+      valor
     );
+    const valorTexto = `R$ ${(agendamento.valorFinal ?? 0).toFixed(2).replace(".", ",")}`;
     void notificacaoService.avisarCliente(String(agendamento.clienteId), {
       titulo: "Seu serviço está pronto",
-      corpo: `O serviço "${agendamento.tipoServicoPrevisto}" da sua moto foi finalizado. Pode retirá-la na MarioMotos.`,
+      corpo: `O serviço "${agendamento.tipoServicoPrevisto}" da sua moto foi finalizado (${valorTexto}). Pode retirá-la na MarioMotos.`,
       dados: { tipo: "servico_pronto", agendamentoId: String(agendamento._id) },
     });
     res.json(comHoraDoServidor(agendamento));

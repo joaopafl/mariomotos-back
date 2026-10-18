@@ -1,6 +1,8 @@
 import { Types } from "mongoose";
 import { Agendamento, IAgendamento } from "../models/Agendamento";
 import { Moto } from "../models/Moto";
+import { Servico } from "../models/Servico";
+import { TipoServico } from "../models/TipoServico";
 import { Usuario } from "../models/Usuario";
 import { TokenPayload } from "./auth.service";
 
@@ -47,6 +49,8 @@ export const agendamentoService = {
     delete limpos.atendenteNome;
     delete limpos.atendenteTitulo;
     delete limpos.observacoesAtendimento;
+    delete limpos.valorFinal;
+    delete limpos.servicoId;
     delete limpos.lembreteEnviadoEm;
 
     // RN03 revalidado tambem na edicao, caso data/horario mudem
@@ -100,8 +104,28 @@ export const agendamentoService = {
     return ag;
   },
 
+  /** Quantos atendimentos o funcionario finalizou no mes corrente (mes civil em Sao Paulo, UTC-3). */
+  async contarFinalizadosNoMes(atendenteId: string): Promise<number> {
+    const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+    const [ano, mes] = hoje.split("-").map(Number);
+    const proximoAno = mes === 12 ? ano + 1 : ano;
+    const proximoMes = mes === 12 ? 1 : mes + 1;
+    const dois = (n: number) => String(n).padStart(2, "0");
+    const inicio = new Date(`${ano}-${dois(mes)}-01T00:00:00-03:00`);
+    const fim = new Date(`${proximoAno}-${dois(proximoMes)}-01T00:00:00-03:00`);
+    return Agendamento.countDocuments({
+      atendenteId: new Types.ObjectId(atendenteId),
+      finalizadoEm: { $gte: inicio, $lt: fim },
+    });
+  },
+
   /** Quem iniciou o atendimento o finaliza, com as observacoes do que foi feito. */
-  async finalizar(id: string, usuario: TokenPayload, observacoes: string): Promise<IAgendamento> {
+  async finalizar(
+    id: string,
+    usuario: TokenPayload,
+    observacoes: string,
+    valor?: number
+  ): Promise<IAgendamento> {
     const ag = await Agendamento.findById(id);
     if (!ag) throw new Error("Agendamento nao encontrado.");
     if (!ag.iniciadoEm) throw new Error("Inicie o atendimento antes de finalizar.");
@@ -112,8 +136,26 @@ export const agendamentoService = {
     const texto = (observacoes || "").trim();
     if (!texto) throw new Error("Preencha as observacoes do atendimento.");
 
+    // O valor vem tabelado pelo servico escolhido; o mecanico pode ajustar apos a vistoria no local
+    if (valor !== undefined && (!Number.isFinite(valor) || valor < 0)) {
+      throw new Error("Valor do servico invalido.");
+    }
+    const tipo = await TipoServico.findOne({ nome: ag.tipoServicoPrevisto }).select("valorPadrao").lean();
+    const valorFinal = valor !== undefined ? valor : tipo?.valorPadrao ?? 0;
+
+    // Entra no historico de servicos da moto (consultas e relatorios)
+    const servico = await Servico.create({
+      motoId: ag.motoId,
+      tipoServico: ag.tipoServicoPrevisto,
+      data: ag.data,
+      valor: valorFinal,
+      observacoes: texto,
+    });
+
     ag.finalizadoEm = new Date();
     ag.observacoesAtendimento = texto;
+    ag.valorFinal = valorFinal;
+    ag.servicoId = servico._id as Types.ObjectId;
     await ag.save();
     return ag;
   },
