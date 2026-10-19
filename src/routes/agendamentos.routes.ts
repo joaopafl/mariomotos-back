@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { Types } from "mongoose";
 import { agendamentoService } from "../services/agendamento.service";
 import { horarioService } from "../services/horario.service";
 import { notificacaoService } from "../services/notificacao.service";
@@ -7,6 +8,7 @@ import { IAgendamento } from "../models/Agendamento";
 import { Cliente } from "../models/Cliente";
 import { Moto } from "../models/Moto";
 import { TipoServico } from "../models/TipoServico";
+import { Servico } from "../models/Servico";
 
 const router = Router();
 
@@ -79,12 +81,43 @@ router.get("/:id", async (req: Request, res: Response) => {
       return res.status(403).json({ erro: "Voce so pode ver os seus agendamentos." });
     }
     // Junta os dados da moto e do cliente, para a tela de detalhes nao depender de outras rotas
-    const [cliente, moto, tipo] = await Promise.all([
+    const [cliente, moto, tipo, servicos] = await Promise.all([
       Cliente.findById(agendamento.clienteId).select("nome telefone email").lean(),
       Moto.findById(agendamento.motoId).select("modelo placa ano").lean(),
       TipoServico.findOne({ nome: agendamento.tipoServicoPrevisto }).select("valorPadrao").lean(),
+      Servico.find({
+        _id: {
+          $in: [agendamento.servicoId, ...(agendamento.itensExtras ?? []).map((i) => i.servicoId)].filter(
+            Boolean
+          ) as Types.ObjectId[],
+        },
+      })
+        .select("valor")
+        .lean(),
     ]);
-    res.json({ ...comHoraDoServidor(agendamento), cliente, moto, valorTabelado: tipo?.valorPadrao ?? 0 });
+    // Os valores acompanham os servicos do historico, que o administrador pode ter corrigido
+    const valorDe = new Map<string, number>(servicos.map((x) => [String(x._id), x.valor] as [string, number]));
+    const itensExtras = (agendamento.itensExtras ?? []).map((i) => ({
+      _id: i._id,
+      tipoServico: i.tipoServico,
+      adicionadoEm: i.adicionadoEm,
+      valor: (i.servicoId && valorDe.get(String(i.servicoId))) ?? i.valor,
+    }));
+    const valorPrincipal = agendamento.servicoId
+      ? valorDe.get(String(agendamento.servicoId)) ?? agendamentoService.valorDoPrincipal(agendamento)
+      : undefined;
+    const valorFinal = agendamento.finalizadoEm
+      ? (valorPrincipal ?? 0) + itensExtras.reduce((t, i) => t + i.valor, 0)
+      : undefined;
+    res.json({
+      ...comHoraDoServidor(agendamento),
+      itensExtras,
+      cliente,
+      moto,
+      valorTabelado: tipo?.valorPadrao ?? 0,
+      valorPrincipal,
+      valorFinal,
+    });
   } catch (err) {
     res.status(500).json({ erro: (err as Error).message });
   }
@@ -142,13 +175,15 @@ router.put("/:id/iniciar", autorizar("funcionario"), async (req: Request, res: R
 // ...e finaliza, informando as observacoes do que foi feito. O cliente recebe o aviso de servico pronto.
 router.put("/:id/finalizar", autorizar("funcionario"), async (req: Request, res: Response) => {
   try {
-    const bruto = req.body?.valor;
-    const valor = bruto === undefined || bruto === null || bruto === "" ? undefined : Number(bruto);
+    const brutoTempo = req.body?.duracaoMinutos;
+    const duracao =
+      brutoTempo === undefined || brutoTempo === null || brutoTempo === "" ? undefined : Number(brutoTempo);
     const agendamento = await agendamentoService.finalizar(
       req.params.id,
       req.usuarioAutenticado!,
       String(req.body?.observacoes ?? ""),
-      valor
+      duracao,
+      String(req.body?.motivoAjuste ?? "")
     );
     const valorTexto = `R$ ${(agendamento.valorFinal ?? 0).toFixed(2).replace(".", ",")}`;
     void notificacaoService.avisarCliente(String(agendamento.clienteId), {
@@ -159,6 +194,40 @@ router.put("/:id/finalizar", autorizar("funcionario"), async (req: Request, res:
     res.json(comHoraDoServidor(agendamento));
   } catch (err) {
     res.status(409).json({ erro: (err as Error).message });
+  }
+});
+
+// O mecanico que esta atendendo inclui (ou remove) servicos do catalogo no atendimento
+router.post("/:id/itens", autorizar("funcionario"), async (req: Request, res: Response) => {
+  try {
+    const ag = await agendamentoService.adicionarItem(
+      req.params.id,
+      req.usuarioAutenticado!,
+      String(req.body?.tipoServicoId ?? "")
+    );
+    res.status(201).json(ag.itensExtras);
+  } catch (err) {
+    res.status(409).json({ erro: (err as Error).message });
+  }
+});
+
+router.delete("/:id/itens/:itemId", autorizar("funcionario"), async (req: Request, res: Response) => {
+  try {
+    const ag = await agendamentoService.removerItem(req.params.id, req.usuarioAutenticado!, req.params.itemId);
+    res.json(ag.itensExtras);
+  } catch (err) {
+    res.status(409).json({ erro: (err as Error).message });
+  }
+});
+
+// Somente o administrador altera o valor de um atendimento ja finalizado
+router.put("/:id/valor", autorizar("administrador"), async (req: Request, res: Response) => {
+  try {
+    const itemId = req.body?.itemId ? String(req.body.itemId) : undefined;
+    const ag = await agendamentoService.ajustarValor(req.params.id, Number(req.body?.valor), itemId);
+    res.json({ valorFinal: ag.valorFinal });
+  } catch (err) {
+    res.status(400).json({ erro: (err as Error).message });
   }
 });
 

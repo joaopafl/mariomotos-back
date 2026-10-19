@@ -46,6 +46,8 @@ router.get("/:id", async (req: Request, res: Response) => {
 });
 
 router.put("/:id", async (req: Request, res: Response) => {
+  // Somente o administrador altera o valor do servico
+  if (req.usuarioAutenticado?.perfil !== "administrador") delete req.body.valor;
   try {
     await servicoService.atualizar(req.params.id, req.body);
     res.status(204).send();

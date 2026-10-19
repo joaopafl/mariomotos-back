@@ -13,7 +13,7 @@ export const servicoService = {
   },
 
   async listarPorMoto(motoId: string): Promise<IServico[]> {
-    return Servico.find({ motoId }).sort({ data: -1 });
+    return Servico.find({ motoId }).sort({ data: -1, createdAt: -1 });
   },
 
   /** Admin: todos os servicos, com placa/modelo da moto para facilitar a busca no app. */

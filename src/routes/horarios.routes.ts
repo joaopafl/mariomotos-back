@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { horarioService } from "../services/horario.service";
 import { autenticar, autorizar } from "../middlewares/autenticar.middleware";
+import { jaPassou } from "../utils/tempo";
 
 const router = Router();
 
@@ -10,7 +11,8 @@ router.use(autenticar);
 router.get("/dia/:data", async (req: Request, res: Response) => {
   try {
     const ehCliente = req.usuarioAutenticado?.perfil === "cliente";
-    res.json(await horarioService.listarPorDia(req.params.data, ehCliente));
+      const lista = await horarioService.listarPorDia(req.params.data, ehCliente);
+      res.json(ehCliente ? lista.filter((h) => !jaPassou(h.data, h.horario)) : lista);
   } catch (err) {
     res.status(400).json({ erro: (err as Error).message });
   }
